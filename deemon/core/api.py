@@ -18,7 +18,7 @@ class PlatformAPI:
         self.platform = self.get_platform()
         self.account_type = None
         self.api = self.set_platform()
-        
+
         if config.check_account_status():
             self.account_type = self.get_account_type()
 
@@ -27,7 +27,7 @@ class PlatformAPI:
             if not payload:
                 payload = ""
             logger.debug(f"DEBUG_MODE: {message} {str(payload)}")
-            
+
     def get_platform(self):
         if config.fast_api():
             return "deezer-gw"
@@ -45,7 +45,7 @@ class PlatformAPI:
                 return self.dz.gw
         else:
             return self.dz.api
-        
+
     def get_account_type(self):
         logger.info("Verifying ARL, please wait...")
         temp_dz = Deezer()
@@ -61,10 +61,16 @@ class PlatformAPI:
             return "free"
 
     #TODO GW API appears to ignore limit; must implement afterwards
-    def search_artist(self, query: str, limit: int = 5):
+    def search_artist(self, query: str, limit: int = 5000):
         """
         Return a list of dictionaries from API containing {'id': int, 'name': str}
         """
+        def check_exact_match(results, query):
+            for result in results:
+                if result['name'].lower() == query.lower():
+                    return result
+            return None
+
         if self.platform == "deezer-gw":
             api_result = []
             try:
@@ -81,6 +87,14 @@ class PlatformAPI:
                 api_result.append({'id': int(r['ART_ID']), 'name': r['ART_NAME']})
         else:
             api_result = self.api.search_artist(query=query, limit=limit)['data']
+
+        # Check for exact match and prioritize it
+        exact_match = check_exact_match(api_result, query)
+        if exact_match:
+            # Remove the exact match from its current position
+            api_result = [res for res in api_result if res != exact_match]
+            # Insert the exact match at the top
+            api_result.insert(0, exact_match)
 
         return {'query': query, 'results': api_result}
 
@@ -109,7 +123,7 @@ class PlatformAPI:
                 logger.debug(f"API error: {e}")
                 return
             return {'id': result['id'], 'name': result['name']}
-        
+
     def get_album(self, query: int) -> dict:
         """Return a dictionary from API containing album info"""
         if self.platform == "deezer-gw":
@@ -169,7 +183,7 @@ class PlatformAPI:
             album_details = self.api.get_album(query['album_id'])
             if album_details.get('label'):
                 album['label'] = album_details['label']
-        
+
         return album
 
     def get_artist_albums(self, query: dict, limit: int = -1):
@@ -239,10 +253,10 @@ class PlatformAPI:
                         logger.warning(f"   [!] Found release without release date, assuming today: "
                                        f"{query['artist_name']} - {r['ALB_TITLE']}")
                         release_date = datetime.strftime(datetime.today(), "%Y-%m-%d")
-                    
+
                     cover_art = f"https://e-cdns-images.dzcdn.net/images/cover/{r['ALB_PICTURE']}/500x500-00000-80-0-0.jpg"
                     album_url = f"https://www.deezer.com/album/{r['ALB_ID']}"
-                    
+
                     api_result.append(
                         {
                             'id': int(r['ALB_ID']),
