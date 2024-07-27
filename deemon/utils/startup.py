@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from datetime import datetime
 
 import requests
 from packaging.version import parse as parse_version
@@ -66,9 +67,11 @@ def get_database():
 
 def get_log_file():
     """
-    Get path to log file
+    Get path to log file with the current date in the filename.
     """
-    return Path(get_appdata_dir() / 'logs' / 'deemon.log')
+    current_date = datetime.now().strftime('%d-%m-%Y')
+    log_filename = f'{current_date}-deemon.log'
+    return Path(get_appdata_dir() / 'logs' / log_filename)
 
 
 def get_latest_version(release_type):
@@ -99,7 +102,7 @@ def get_changelog(ver: str):
                                 "deemon/releases")
     except requests.exceptions.ConnectionError:
         return print("Unable to reach GitHub API")
-    
+
     for release in response.json():
         if release['name'] == ver:
             return print(release['body'])
